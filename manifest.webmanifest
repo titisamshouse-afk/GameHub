@@ -1,0 +1,19 @@
+{
+  "name": "GameHub",
+  "short_name": "GameHub",
+  "description": "Your gaming space for Minecraft servers, modpacks, friends, and achievements.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a1020",
+  "theme_color": "#1677ff",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
