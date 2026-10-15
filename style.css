@@ -4,3 +4,5 @@
 
 /* Responsive feature controls for categorized mods and server selection */
 .feature-shortcuts,.category-pills,.host-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.feature-shortcuts .btn,.category-pills .btn{margin:0}.mod-option small{display:block;line-height:1.5}.mod-option .btn{align-self:flex-start;margin-top:4px}.mod-card .host-actions{margin-top:12px}.category-pills{margin:10px 0 16px}.search{box-sizing:border-box}
+
+.auth-card{max-width:680px}.tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.tag-list .pill{max-width:none}.auth-card form{display:grid;gap:8px}.auth-card .field-label{margin-top:8px}
