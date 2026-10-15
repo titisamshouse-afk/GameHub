@@ -29,23 +29,32 @@
   ];
   function metricValue(key) {
     const stats=read('feature-stats')||{};
-    if(key==='games')return (read('games')||[]).length;
-    if(key==='servers')return (read('servers')||[]).length;
-    if(key==='packs')return (read('modPacks')||[]).length;
-    if(key==='friends')return (read('friends')||[]).length + (stats.socialFriends||0);
-    if(key==='profile'){const p=read('profile')||{};return p.name&&p.bio?1:0;}
-    return stats[key]||0;
+    let local=0;
+    if(key==='games')local=(read('games')||[]).length;
+    else if(key==='servers')local=(read('servers')||[]).length;
+    else if(key==='packs')local=(read('modPacks')||[]).length;
+    else if(key==='friends')local=(read('friends')||[]).length+(stats.socialFriends||0);
+    else if(key==='profile'){const p=read('profile')||{};local=p.name&&p.bio?1:0;}
+    else local=stats[key]||0;
+    const remoteRows=window.ghxRemoteAchievements||{};
+    const remote=Math.max(0,...achievements.filter(a=>a.metric===key).map(a=>Number(remoteRows[a.key]?.progress)||0));
+    return Math.max(local,remote);
   }
   async function syncAchievements() {
-    const c=client(); const u=await getUser(); if(!c||!u)return;
-    const rows=achievements.map(a=>({user_id:u.id,achievement_key:a.key,progress:Math.min(a.goal,metricValue(a.metric)),unlocked_at:metricValue(a.metric)>=a.goal?new Date().toISOString():null,updated_at:new Date().toISOString()}));
+    const c=client(); const u=await getUser(); if(!c||!u)return false;
+    const existing=await c.from('gamehub_achievement_progress').select('achievement_key,progress,unlocked_at').eq('user_id',u.id);
+    if(existing.error){console.warn('Achievement load:',existing.error.message);return false;}
+    window.ghxRemoteAchievements=Object.fromEntries((existing.data||[]).map(row=>[row.achievement_key,row]));
+    const rows=achievements.map(a=>({user_id:u.id,achievement_key:a.key,progress:Math.min(a.goal,metricValue(a.metric)),unlocked_at:metricValue(a.metric)>=a.goal?(window.ghxRemoteAchievements[a.key]?.unlocked_at||new Date().toISOString()):null,updated_at:new Date().toISOString()}));
     const {error}=await c.from('gamehub_achievement_progress').upsert(rows,{onConflict:'user_id,achievement_key'});
-    if(error)console.warn('Achievement sync:',error.message);
+    if(error){console.warn('Achievement sync:',error.message);return false;}
+    window.ghxRemoteAchievements=Object.fromEntries(rows.map(row=>[row.achievement_key,row]));
+    return true;
   }
-  function drawAchievements() {
+  function drawAchievements(skipSync=false) {
     const cards=achievements.map(a=>{const progress=Math.min(a.goal,metricValue(a.metric));const unlocked=progress>=a.goal;return '<article class="card achievement-card"><div class="row"><div class="feature-icon">'+a.icon+'</div><span class="pill '+(unlocked?'achievement-unlocked':'')+'">'+(unlocked?'✓ Unlocked':'In progress')+'</span></div><h3>'+esc(a.name)+'</h3><p class="muted">'+esc(a.desc)+'</p><div class="achievement-track"><span style="width:'+Math.round(progress/a.goal*100)+'%"></span></div><small class="muted">'+progress+' / '+a.goal+'</small></article>';}).join('');
     root.innerHTML=heading('Achievement Tracker','Earn badges as you use GameHub. Progress is tracked on this device and synced to your account when signed in.','GAMEHUB')+'<div class="stat-grid"><div class="stat"><div class="stat-label">Achievements unlocked</div><div class="stat-value">'+achievements.filter(a=>metricValue(a.metric)>=a.goal).length+' / '+achievements.length+'</div></div><div class="stat"><div class="stat-label">Total progress</div><div class="stat-value">'+Math.round(achievements.reduce((n,a)=>n+Math.min(a.goal,metricValue(a.metric))/a.goal,0)/achievements.length*100)+'%</div></div></div><div class="grid achievement-grid">'+cards+'</div><div style="margin-top:16px">'+btn('Sync progress to account','sync-achievements')+' '+btn('Refresh progress','refresh-achievements')+'</div><p class="footer-note">Achievements measure actions inside GameHub; they do not verify achievements inside Minecraft, Roblox, or other games.</p>';
-    syncAchievements();
+    if(!skipSync)syncAchievements().then(()=>drawAchievements(true));
   }
   const serverFavorites=()=>read('server-favorites')||[];
   function isFavorite(id){return serverFavorites().includes(String(id));}
@@ -122,7 +131,7 @@
     if(action==='favorite'){const parts=value.split('|');return toggleServerFavorite(decodeURIComponent(parts[0]),parts[1]);}
     if(action==='details'){const parts=value.split('|'),id=decodeURIComponent(parts[0]),community=parts[1]==='community',s=(window.ghxServerRows||[]).find(x=>String(community?x.id:'local-'+x.id)===id);const el=document.getElementById('detail-'+id);if(el&&s){el.hidden=!el.hidden;el.innerHTML='<p><strong>Source:</strong> '+(community?'Community directory':'Your device')+'</p><p><strong>Address:</strong> '+esc(s.address)+'</p><p><strong>Version:</strong> '+esc(s.minecraft_version||s.version||'Not specified')+'</p><p><strong>Description:</strong> '+esc(s.description||'No description')+'</p><p><strong>Tags:</strong> '+esc((s.tags||[]).join(', ')||'None')+'</p>'; }return;}
     if(action==='status'){const parts=value.split('|'),address=decodeURIComponent(parts[0]),id=decodeURIComponent(parts[1]),el=document.getElementById('status-'+id);if(!address||address==='Add your server IP'){if(el)el.textContent='Add a real address first';return;}if(el)el.textContent='Checking…';try{const bed=/bedrock/i.test((window.ghxServerRows||[]).find(x=>String(x.id)===id)?.edition||'');const url='https://api.mcsrvstat.us/'+(bed?'bedrock/3/':'3/')+encodeURIComponent(address);const res=await fetch(url);if(!res.ok)throw new Error('Status service returned '+res.status);const j=await res.json();if(el)el.textContent=j.online?'Online · '+(j.players?.online??'?')+'/'+(j.players?.max??'?'):'Offline / query unavailable';}catch(_){if(el)el.textContent='Status unavailable';}return;}
-    if(action==='sync-achievements'){const u=await getUser();if(!u)return alert('Sign in on the Account Login page to sync achievement progress across devices.');await syncAchievements();alert('Achievement progress sync completed.');return;}
+    if(action==='sync-achievements'){const u=await getUser();if(!u)return alert('Sign in on the Account Login page to sync achievement progress across devices.');const ok=await syncAchievements();if(ok)drawAchievements(true);alert(ok?'Achievement progress synced to your account.':'Could not sync. Check your connection and sign-in status.');return;}
     if(action==='refresh-achievements'){drawAchievements();return;}
     if(action==='search-open'){const r=(window.ghxSearchResults||[])[Number(value)];if(r)navigate(r.action||'home');return;}
     if(action==='global-search'){runGlobalSearch();return;}
