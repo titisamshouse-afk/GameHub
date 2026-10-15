@@ -2,6 +2,7 @@
 (() => {
   'use strict';
   const root = document.getElementById('app');
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(() => {}));
   if (!root) return;
   const client = () => window.ghSupabase || null;
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
