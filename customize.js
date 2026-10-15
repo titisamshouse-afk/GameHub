@@ -85,7 +85,7 @@
         localWrite(trackerKey,trackerData);
       }
     }
-    if(!trackerData.games.length){trackerData.games=[seedGame('Fortnite',catalog[0]),seedGame('Roblox',catalog[1]),seedGame('Minecraft',catalog[2])];trackerData.selected='fortnite';localWrite(trackerKey,trackerData);}
+    if(!trackerData.games.length){trackerData.games=[seedGame('Fortnite',catalog[0]),seedGame('Roblox',catalog[1]),seedGame('Minecraft',catalog[2])];trackerData.selected='fortnite';localWrite(trackerKey,trackerData);if(trackerUser!=='local')trackerData.games.forEach(g=>syncGame(g));}
     if(!trackerData.selected||!trackerData.games.some(g=>g.key===trackerData.selected))trackerData.selected=trackerData.games[0]?.key||'';
     renderGameTracker();
   }
@@ -100,7 +100,7 @@
     const mount=trackerMount;if(!mount||!mount.isConnected)return;
     const query=trackerQuery.trim().toLowerCase(),matches=catalog.filter(g=>(g.name+' '+g.category).toLowerCase().includes(query)).slice(0,8);
     const current=currentGame();
-    mount.innerHTML='<div class="game-tracker-head"><div><div class="eyebrow">GAME CHECKLIST</div><h2>Track achievements in your games</h2><p class="muted">Choose a game, search the starter catalog, or type any game name. Check off the goals you have not completed yet.</p></div><div class="game-tracker-count"><strong>'+trackerData.games.reduce((n,g)=>n+g.achievements.filter(a=>a.done).length,0)+'</strong><small>checked off</small></div></div>'+
+    mount.innerHTML='<div class="game-tracker-head"><div><div class="eyebrow">GAME CHECKLIST</div><h2>Track achievements in your games</h2><p class="muted">Choose a game, search the starter catalog, or type any game name. Check off goals you have completed; leave unfinished ones unchecked.</p></div><div class="game-tracker-count"><strong>'+trackerData.games.reduce((n,g)=>n+g.achievements.filter(a=>a.done).length,0)+'</strong><small>checked off</small></div></div>'+
       '<form id="ghGameSearchForm" class="game-search-form"><label for="ghGameSearch">Find a game or paste/type its title</label><div class="search-row"><input id="ghGameSearch" value="'+esc(trackerQuery)+'" placeholder="Fortnite, Roblox, Minecraft, or any game name"><button class="btn primary" type="submit">Search games</button></div></form>'+
       '<div class="game-picker-grid">'+matches.map(g=>'<button type="button" class="game-picker '+(current?.key===g.key?'selected':'')+'" data-ghcustom="add-catalog-game|'+esc(g.key)+'"><span class="game-picker-icon">'+esc(g.icon)+'</span><span><strong>'+esc(g.name)+'</strong><small>'+esc(g.category)+' · starter checklist</small></span><span class="game-picker-action">'+(trackerData.games.some(x=>x.key===g.key)?'Open':'＋ Add')+'</span></button>').join('')+
       (query&&!catalog.some(g=>g.name.toLowerCase()===query)&&!trackerData.games.some(g=>g.name.toLowerCase()===query)?'<button type="button" class="game-picker custom-game-choice" data-ghcustom="add-custom-game|'+encodeURIComponent(trackerQuery.trim())+'"><span class="game-picker-icon">🎮</span><span><strong>Add “'+esc(trackerQuery.trim())+'”</strong><small>Custom game · starter checklist you can edit</small></span><span class="game-picker-action">＋ Add</span></button>':'')+
